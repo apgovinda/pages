@@ -13,10 +13,13 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
+      - name: Start Ubuntu MySQL
+        run: sudo systemctl start mysql.service
       - name: Build with Gradle
-        run: |
-          chmod +x ./gradlew
-          ./gradlew clean build
+        uses: eskatos/gradle-command-action@v1
+        with:
+          arguments: build -xtest
+          gradle-version: 6.4.1
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
         with:
@@ -29,7 +32,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           repository: apgovinda/pages
-          tags: repo
+          tags: persist
   deploy-image-to-pks:
     needs: build-artifact
     runs-on: ubuntu-latest

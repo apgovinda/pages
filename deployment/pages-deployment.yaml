@@ -24,7 +24,7 @@ spec:
         persistentVolumeClaim:
           claimName: log-persistent-claim
       containers:
-      - image: apgovinda/pages:repo
+      - image: apgovinda/pages:persist
         imagePullPolicy: Always
         name: pages
         ports:
