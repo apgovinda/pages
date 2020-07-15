@@ -273,7 +273,7 @@ Configuration Starts
 # Follow Instructions to Externalize the Welcome Message
 
 ## Code Change
-- Verify the *HomeControllerTests.java* file to check the change in test. The *HomeController.java* needs to be changed to pass the test case
+- Verify the *HomeControllerTest.java* file to check the change in test. The *HomeController.java* needs to be changed to pass the test case
 - In *HomeController.java* create a String variable **pageContent** and intialize it through constructor using @Value annotation. Use the same variable in getPage() method to return welcome message. 
 ```java
 package org.dell.kube.pages;
@@ -321,17 +321,17 @@ This would supply the value for pageContent during test and bootRun gradle tasks
 - Build the application using gradle
 - run the following commands to generate the Docker image
 ```shell script
-docker build -t <docker_username>/pages:config .
+docker build -t <docker_username>/<docker_repo>:config .
 ``` 
 - run the following command to run the image
 ```shell script
-docker run -p 8080:8080 -t <docker_username>/pages:config
+docker run -p 8080:8080 -t <docker_username>/<docker_repo>:config
 ```
 Then open the application at http://localhost:8080 to test it.
 
 - Push the image to docker
 ```shell script
-docker push <docker_username>/pages:config
+docker push <docker_username>/<docker_repo>:config
 ```
 
 ### Running the image in Kubernetes
@@ -341,7 +341,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: pages-config-map
-  namespace: <your-name>
 data:
   PAGE_CONTENT: "Green-Pages coming from Yellow-world!"
 ```
@@ -355,22 +354,122 @@ env:
         name: pages-config-map
         key: PAGE_CONTENT
 ```
-- Run the following commands for minikube and pks to run the application in kubernetes cluster. Follow the previous lab to check the instructions to run the application in *minikube* and *PKS*. In the file **pages-service.yaml** value for *type* would be *NodePort* and *LoadBalancer* for minikube and pks respectively. 
+- Run the following commands in kubernetes to run the application 
 ```shell script
-kubectl apply -f deployment/pages-namespace.yaml
-kubectl apply -f deployment/pages-config.yaml
-kubectl apply -f deployment/pages-service.yaml
-kubectl apply -f deployment/pages-deployment.yaml
+kubectl -f deployment/pages-config.yaml
+kubectl -f deployment/pages-service.yaml
+kubectl -f deployment/pages-deployment.yaml
 ```
 - Verify the deployment, configMap and service are created by using the following command
 ```shell script
-kubectl get deployment pages --namespace pages-<your-name>
-kubectl get cm pages-config-map  --namespace pages-<your-name>
-kubectl get service pages  --namespace pages-<your-name>
+kubectl get deployment pages
+kubectl get service pages
+kubectl get cm pages-config-map
 ```
-- Identify the url of the **pages** service from the output above command. Refer to the previous lab for instructions to know the url of the service for both minikube and pks
-- Open the pages url in browser to test the application.  
-- Push the code to github repository
+- Identify the external ip of the **pages** service
+- Open the pages url in http://<external-ip>:\<nodePort> to test the application
 -------------
 Configuration Ends
 ------------------
+Pipleline Starts
+-----------------
+# Follow Instructions to create pipeline using github actions
+
+## Step 1
+- Create the following *secrets* in your github repository. To create secrets access  the settings section of your repository and select secrets.
+    * DOCKER_USERNAME
+    * DOCKER_PASSWORD
+    * PKS_USERNAME
+    * PKS_PASSWORD
+    * PKS_API
+    * PKS_CLUSTER
+- Create the following directory .github/workflows and create a file called pipeline.yaml under it with below content
+```yaml
+name: Pages Pipeline
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build-artifact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Build with Gradle
+        run: |
+          chmod +x ./gradlew
+          ./gradlew clean build
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifact
+          path: build/libs/pages.jar
+
+      - name: build-docker-image
+        uses: docker/build-push-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          repository: <docker-user-name>/pages
+          tags: <tag-name>
+  deploy-image-to-pks:
+    needs: build-artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Pivnet & PKS
+        run: |
+          sudo apt-get update
+          wget -O pivnet github.com/pivotal-cf/pivnet-cli/releases/download/v0.0.55/pivnet-linux-amd64-0.0.55 && chmod +x pivnet && sudo mv pivnet /usr/local/bin
+          pivnet login --api-token=cd8d86d24afa43b9bd989012adcbf3f5-r
+          pivnet download-product-files --product-slug='pivotal-container-service' --release-version='1.7.0' --product-file-id=646536
+          sudo mv pks-linux-amd64-1.7.0-build.483 pks
+          chmod +x pks
+          sudo mv pks /usr/local/bin/
+      - name: Install Kubectl
+        run: |
+          pivnet download-product-files --product-slug='pivotal-container-service' --release-version='1.7.0' --product-file-id=633728
+          sudo mv  kubectl-linux-amd64-1.16.7 kubectl
+          sudo mv kubectl /usr/local/bin/
+      - name: PKS Login
+        run: |
+          pks login -a ${{ secrets.PKS_API }}  ${{ secrets.PKS_CLUSTER }} -u ${{ secrets.PKS_USERNAME }} -k -p ${{ secrets.PKS_PASSWORD }}
+          pks get-credentials pks-workshop
+          kubectl apply -f deployment/pages-namespace.yaml
+          kubectl apply -f deployment/pages-config.yaml
+          kubectl apply -f deployment/pages-service.yaml
+          kubectl apply -f deployment/pages-deployment.yaml
+
+
+
+
+
+    #1 - Install Pivnet
+    #2 - Install PKS CLI
+    #3 - Install kubectl
+    #4 - Login to pks
+    #5 - Set the kubectl context to target pks cluster
+    #6 - Create ConfigMap/Secrets
+    #7 - Create Service
+    #8-  Create Deployment
+```
+- Replace the **tag-name** and **docker-user-name** with proper *tag-name* and your own docker *user name*.
+- Steps to create pivnet token as per your own account and put it in pipeline.yaml
+```text
+1. Create an account using the link https://account.run.pivotal.io/z/uaa/sign-up
+2. Check your inbox and verify email, so that you can sign in successfully.
+3. Access https://network.pivotal.io/users/dashboard/edit-profile
+4. Create an API token and copy it.
+5. Update the token in the pages/.github/workflows/pipeline.yaml file under the workflow deploy-image-to-pks section for the below line
+    pivnet login --api-token=<paste-your-token-here>
+```
+- Push your code to git repository and wait till git actions starts the build and deploys to PKS cluster
+- Verify your objects in pks cluster and access the service in browser as mentioned in the previous lab
+-------------
+Pipeline Ends
+-------------
