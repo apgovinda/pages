@@ -20,10 +20,15 @@ spec:
         servicefor: pages
     spec:
       containers:
-      - image: apgovinda/pages:0.1
-        imagePullPolicy: Always
+      - image: apgovinda/pages:config
         name: pages
         ports:
           - containerPort: 8080
         resources: {}
+        env:
+          - name: PAGE_CONTENT
+            valueFrom:
+              configMapKeyRef:
+                name: pages-config-map
+                key: PAGE_CONTENT
 status: {}

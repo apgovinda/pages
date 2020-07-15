@@ -244,80 +244,133 @@ Then open the application at http://localhost:8080 to test it.
 ```shell script
 docker push <docker_username>/<docker_repo>:<tag>
 ```
---------------
-Dockerization Ends
---------------
-Kubernetization Starts
---------------
-# Follow Instructions to  Kubernetise the Pages Application
 
 ### Running the image in Kubernetes
-- Fill the pages-namespace.yaml
-  * Assign *<your-first-name>* to **name**
 - Fill the pages-services.yaml
   * Assign **8080** to *targetPort* and *port*
   * Assign **TCP** to *protocol*
   * Assign the value **pages** to *app*, *servicefor* and *name*
-  * In metadata section add *namespace: \<your-name>*
 - Fill the pages-deployment.yaml
   * Assign the value **pages** to *app*, *servicefor* and *name* 
-  * Assign proper values for \<docker_username>/pages:kube for value of image.
-  * In metadata section add *namespace: \<your-name>* 
-- In all the above section replace \<your-name> with your own **first name**.
-#### Instructions for the  application to be deployed in minikube for local testing
-*minikube* and *kubectl* must be installed in the local machine vm. To start *minikube* "minikube start" or "minikube start --driver=virtualbox/docker" could be executed in the terminal.
-- Change type in *pages-service.yaml* to *NodePort*
-- Run the following commands in terminal to  run the application in minikube
+  * Assign <docker_username>/<docker_repo>:\<tag> for image
+- Run the following commands in kubernetes to run the application 
 ```shell script
-kubectl -f deployment/pages-namespace.yaml
 kubectl -f deployment/pages-service.yaml
 kubectl -f deployment/pages-deployment.yaml
 ```
-- The above commands will create a namespace in the name \<your-name> and a deployment, service called pages under the same namespace.
-Verify the namespace, deployment and service are created by using the following command
+- Verify the deployment and service are created by using the following command
 ```shell script
-kubectl get deployment pages --namespace <your-name>
-kubectl get service pages --namespace <your-name>
+kubectl get deployment pages
+kubectl get service pages
 ```
-- Below command would set your default namespace to the new namespace and we don't need to suffix --namespace in all commands
-```shell script
-kubectl config set-context --current --namespace=<your-name>
-```
-- Execute the command "minikube service pages --namespace \<your-name>" and it would open the application in the browser.
+- Identify the external ip of the **pages** service
+- Open the pages url in http://<external-ip>:\<nodePort> to test the application
+------------------
+Dockerization Solution Ends
+---------------------
+Configuration Starts
+---------------------
+# Follow Instructions to Externalize the Welcome Message
+
+## Code Change
+- Verify the *HomeControllerTests.java* file to check the change in test. The *HomeController.java* needs to be changed to pass the test case
+- In *HomeController.java* create a String variable **pageContent** and intialize it through constructor using @Value annotation. Use the same variable in getPage() method to return welcome message. 
+```java
+package org.dell.kube.pages;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/")
+public class HomeController {
+
+    private String pageContent;
+
+    public HomeController(@Value("${page.content}") String pageContent){
+        this.pageContent=pageContent;
+
+    }
+    @GetMapping
+    public String getPage(){
+        return "Hello from page : "+pageContent+" ";
+    }
 
 
-#### Instructions for the  application to be deployed in Enterprise PKS
-- **pks cli** must have been installed already 
-- Receive the **pks-username**, **pks-password**, **pks-cluster-name** and **pks-api-name**.
-- Execute the below command to login to the PKS 
-```shell script
-pks login -a pks-api-name  pks-cluster-name -u pks-username -k -p pks-password
+}
 ```
-- Execute the below command to enter the pks-cluster
-```shell script
-pks get-credentials pks-cluster-name
-```
-Now we are good to execute our commands in the PKS cluster
-- Change type in *pages-service.yaml* to *LoadBalancer*
-- Execute the below commands to create namespace, deployment and service in pks cluster
-```shell script
-kubectl -f deployment/pages-namespace.yaml
-kubectl -f deployment/pages-service.yaml
-kubectl -f deployment/pages-deployment.yaml
-```
-- Verify the namespace, deployment and service are created by using the following command in the pks cluster
-```shell script
-kubectl get deployment pages --namespace <your-name>
-kubectl get service pages --namespace <your-name>
-```
-- Below command would set your default namespace to the new namespace and we don't need to suffix --namespace in all commands
-```shell script
-kubectl config set-context --current --namespace=<your-name>
-```
-- Identify the external ip of the **pages** service from the output of "kubectl get service pages" command.
-- Open the pages url in http://\<external-ip>:8080 to test the application
+- Initialize the variable PAGE_CONTENT in build.gradle for bootRun and test closures by adding below statements
+```groovy
+bootRun.environment([
+		"PAGE_CONTENT": "YellowPages",
+])
 
-- Push your code to github
---------------
-Kubernetization Ends
---------------
+test.environment([
+		"PAGE_CONTENT": "YellowPages",
+])
+```
+This would supply the value for pageContent during test and bootRun gradle tasks.
+- Build and Test the application using
+```shell script
+./gradlew clean build
+./gradlew bootRun
+```
+### Dockerization
+- Build the application using gradle
+- run the following commands to generate the Docker image
+```shell script
+docker build -t <docker_username>/pages:config .
+``` 
+- run the following command to run the image
+```shell script
+docker run -p 8080:8080 -t <docker_username>/pages:config
+```
+Then open the application at http://localhost:8080 to test it.
+
+- Push the image to docker
+```shell script
+docker push <docker_username>/pages:config
+```
+
+### Running the image in Kubernetes
+- Create a new file **pages-config.yaml* in deployment folder to initialize the variable in kubernetes. Use below content
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pages-config-map
+  namespace: <your-name>
+data:
+  PAGE_CONTENT: "Green-Pages coming from Yellow-world!"
+```
+- In *pages-deployment.yaml* replace the image tag name with *config*
+- In *pages-deployment.yaml* make changes to set the PAGE_CONTENT value reading from the ConfigMap. Add the below content inside container section
+```yaml
+env:
+  - name: PAGE_CONTENT
+    valueFrom:
+      configMapKeyRef:
+        name: pages-config-map
+        key: PAGE_CONTENT
+```
+- Run the following commands for minikube and pks to run the application in kubernetes cluster. Follow the previous lab to check the instructions to run the application in *minikube* and *PKS*. In the file **pages-service.yaml** value for *type* would be *NodePort* and *LoadBalancer* for minikube and pks respectively. 
+```shell script
+kubectl apply -f deployment/pages-namespace.yaml
+kubectl apply -f deployment/pages-config.yaml
+kubectl apply -f deployment/pages-service.yaml
+kubectl apply -f deployment/pages-deployment.yaml
+```
+- Verify the deployment, configMap and service are created by using the following command
+```shell script
+kubectl get deployment pages --namespace pages-<your-name>
+kubectl get cm pages-config-map  --namespace pages-<your-name>
+kubectl get service pages  --namespace pages-<your-name>
+```
+- Identify the url of the **pages** service from the output above command. Refer to the previous lab for instructions to know the url of the service for both minikube and pks
+- Open the pages url in browser to test the application.  
+- Push the code to github repository
+-------------
+Configuration Ends
+------------------
