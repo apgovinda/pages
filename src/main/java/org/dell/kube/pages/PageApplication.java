@@ -12,8 +12,7 @@ public class PageApplication {
     }
 
     @Bean
-    public   IPageRepository pageRepository( )
-    {
+    public IPageRepository iPageRepository(){
         return new InMemoryPageRepository();
     }
 }
