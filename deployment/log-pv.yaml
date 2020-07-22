@@ -1,7 +1,7 @@
 kind: PersistentVolume
 apiVersion: v1
 metadata:
-  name: log-persistent-volume2
+  name: log-persistent-volume-gov
   namespace: govinda
   labels:
     type: local

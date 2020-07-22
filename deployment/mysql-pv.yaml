@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: mysql-volume
+  name: mysql-volume-gov
   namespace: govinda
   labels:
     type: local
@@ -12,12 +12,13 @@ spec:
   accessModes:
     - ReadWriteMany
   hostPath:
-    path: "/mnt/data"
+    path: "/mnt/data/govinda"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: mysql-volume-claim
+  name: mysql-volume-claim-gov
+  namespace: govinda
 spec:
   storageClassName: manual
   accessModes:
