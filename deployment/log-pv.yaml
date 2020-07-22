@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: log-persistent-volume
+  name: log-persistent-volume2
   namespace: govinda
   labels:
     type: local
@@ -9,7 +9,7 @@ spec:
   volumeMode: Filesystem
   storageClassName: manual
   capacity:
-    storage: 500Mi
+    storage: 5500Mi
   accessModes:
   - ReadWriteMany
   hostPath:
